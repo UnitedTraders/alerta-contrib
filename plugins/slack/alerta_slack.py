@@ -1,4 +1,3 @@
-
 import json
 import logging
 import os
@@ -74,7 +73,22 @@ class ServiceIntegration(PluginBase):
 
         super(ServiceIntegration, self).__init__(name)
 
+
     def pre_receive(self, alert):
+
+        LOG.info("Normalising alert...")
+
+        # prepend severity to alert text
+        alert.text = '%s: %s' % (alert.severity.upper(), alert.text)
+
+        # supply different default values if missing
+        if not alert.group or alert.group == 'Misc':
+            alert.group = 'Unknown'
+        if not alert.value or alert.value == 'n/a':
+            alert.value = '--'
+
+        alert.tags.append('job='+alert.group)
+
         return alert
 
     def _format_template(self, templateFmt, templateVars):
@@ -108,7 +122,7 @@ class ServiceIntegration(PluginBase):
             color = self._severities[alert.severity]
         else:
             color = '#00CC00'  # green
-
+        
         if SLACK_CHANNEL_ENV_MAP == dict():
             channel = route_alert_by_tag(alert.tags, SLACK_CHANNEL_TAG_MAP, SLACK_CHANNEL)
         else:
