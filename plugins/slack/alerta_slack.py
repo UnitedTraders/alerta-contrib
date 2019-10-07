@@ -6,6 +6,10 @@ import traceback
 
 from collections import OrderedDict
 
+from alerta.plugins import PluginBase
+
+LOG = logging.getLogger('alerta.plugins.slack')
+
 try:
     from jinja2 import Template
 except Exception as e:
@@ -15,10 +19,6 @@ try:
     from alerta.plugins import app  # alerta >= 5.0
 except ImportError:
     from alerta.app import app  # alerta < 5.0
-
-from alerta.plugins import PluginBase
-
-LOG = logging.getLogger('alerta.plugins.slack')
 
 SLACK_ATTACHMENTS = True if os.environ.get(
     'SLACK_ATTACHMENTS', 'False') == 'True' else app.config.get('SLACK_ATTACHMENTS', False)
@@ -34,27 +34,28 @@ if SLACK_CHANNEL_ENV_MAP == dict():
             os.environ.get('SLACK_CHANNEL_TAG_MAP'))
     except Exception as e:
         SLACK_CHANNEL_TAG_MAP = app.config.get('SLACK_CHANNEL_TAG_MAP', OrderedDict())
-    
+
 SLACK_SEND_ON_ACK = os.environ.get(
     'SLACK_SEND_ON_ACK') or app.config.get('SLACK_SEND_ON_ACK', False)
 SLACK_SEVERITY_MAP = app.config.get('SLACK_SEVERITY_MAP', {})
-SLACK_DEFAULT_SEVERITY_MAP = {'security': '#000000', # black
-                              'critical': '#FF0000', # red
-                              'major': '#FFA500', # orange
-                              'minor': '#FFFF00', # yellow
-                              'warning': '#1E90FF', #blue
-                              'informational': '#808080', #gray
-                              'debug': '#808080', # gray
-                              'trace': '#808080', # gray
-                              'ok': '#00CC00'} # green
-SLACK_DEFAULT_SUMMARY_FMT='*[{status}] {environment} {service} {severity}* - _{event} on {resource}_ <{dashboard}/#/alert/{alert_id}|{short_id}>'
+SLACK_DEFAULT_SEVERITY_MAP = {'security': '#000000',  # black
+                              'critical': '#FF0000',  # red
+                              'major': '#FFA500',  # orange
+                              'minor': '#FFFF00',  # yellow
+                              'warning': '#1E90FF',  # blue
+                              'informational': '#808080',  # gray
+                              'debug': '#808080',  # gray
+                              'trace': '#808080',  # gray
+                              'ok': '#00CC00'}  # green
+SLACK_DEFAULT_SUMMARY_FMT = '*[{status}] {environment} {service} {severity}* - _{event} on {resource}_ <{dashboard}/#/alert/{alert_id}|{short_id}>'
 SLACK_HEADERS = {
     'Content-Type': 'application/json'
 }
+SLACK_REPEAT_CHANNELS = app.config.get('SLACK_REPEAT_CHANNELS', [])
 
 # route_alert_by_tag returns channel name for alert based on tag_map
 # special 'default' route used if nothing other routes found
-def route_alert_by_tag(alertTags, routeTags, fallbackChannel = ""):
+def route_alert_by_tag(alertTags, routeTags, fallbackChannel=""):
     for channel, tags in routeTags.items():
         if set(tags).issubset(alertTags):
             return channel
@@ -73,7 +74,6 @@ class ServiceIntegration(PluginBase):
 
         super(ServiceIntegration, self).__init__(name)
 
-
     def pre_receive(self, alert):
 
         LOG.info("Normalising alert...")
@@ -86,8 +86,11 @@ class ServiceIntegration(PluginBase):
             alert.group = 'Unknown'
         if not alert.value or alert.value == 'n/a':
             alert.value = '--'
+        if not alert.environment:
+            alert.environment = 'Development'
 
         alert.tags.append('job='+alert.group)
+        alert.tags.append('env='+alert.environment)
 
         return alert
 
@@ -122,7 +125,7 @@ class ServiceIntegration(PluginBase):
             color = self._severities[alert.severity]
         else:
             color = '#00CC00'  # green
-        
+
         if SLACK_CHANNEL_ENV_MAP == dict():
             channel = route_alert_by_tag(alert.tags, SLACK_CHANNEL_TAG_MAP, SLACK_CHANNEL)
         else:
@@ -174,13 +177,10 @@ class ServiceIntegration(PluginBase):
                         "fallback": summary,
                         "color": color,
                         "fields": [
-                            {"title": "Status", "value": (status if status else alert.status).capitalize(),
-                             "short": True},
-                            {"title": "Environment",
-                                "value": alert.environment, "short": True},
-                            {"title": "Resource", "value": alert.resource, "short": True},
-                            {"title": "Services", "value": ", ".join(
-                                alert.service), "short": True}
+                            {"title": "Status", "value": (status if status else alert.status).capitalize(),"short": True},
+                            {"title": "Environment","value": alert.environment, "short": True},
+                            {"title": "Resource","value": alert.resource, "short": True},
+                            {"title": "Services", "value": ", ".join(alert.service), "short": True}
                         ]
                     }]
                 }
@@ -190,9 +190,6 @@ class ServiceIntegration(PluginBase):
     def post_receive(self, alert, **kwargs):
         SLACK_WEBHOOK_URL = self.get_config('SLACK_WEBHOOK_URL', type=str, **kwargs)
 
-        if alert.repeat:
-            return
-
         try:
             payload = self._slack_prepare_payload(alert, **kwargs)
 
@@ -200,6 +197,10 @@ class ServiceIntegration(PluginBase):
         except Exception as e:
             LOG.error('Exception formatting payload: %s\n%s' % (e, traceback.format_exc()))
             return
+
+        if alert.repeat:
+            if payload["channel"] not in SLACK_REPEAT_CHANNELS:
+                return
 
         try:
             r = requests.post(SLACK_WEBHOOK_URL,
