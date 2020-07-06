@@ -33,7 +33,7 @@ if SLACK_CHANNEL_ENV_MAP == dict():
         SLACK_CHANNEL_TAG_MAP = json.loads(
             os.environ.get('SLACK_CHANNEL_TAG_MAP'))
     except Exception as e:
-        SLACK_CHANNEL_TAG_MAP = app.config.get('SLACK_CHANNEL_TAG_MAP', OrderedDict())
+        SLACK_CHANNEL_TAG_MAP = app.config.get('SLACK_CHANNEL_TAG_MAP', list())
 
 SLACK_SEND_ON_ACK = os.environ.get(
     'SLACK_SEND_ON_ACK') or app.config.get('SLACK_SEND_ON_ACK', False)
@@ -55,15 +55,16 @@ SLACK_REPEAT_CHANNELS = app.config.get('SLACK_REPEAT_CHANNELS', [])
 
 # route_alert_by_tag returns channel name for alert based on tag_map
 # special 'default' route used if nothing other routes found
-def route_alert_by_tag(alertTags, routeTags, fallbackChannel=""):
-    for channel, tags in routeTags.items():
-        if set(tags).issubset(alertTags):
-            return channel
+def route_alert_by_tag(alertTags, routeList, fallbackChannel=""):
+    for route in routeList:
+        if set(route["tags"]).issubset(alertTags):
+            return route["channel"]
 
-    try:
-        return(list(routeTags.keys())[list(routeTags.values()).index("default")])
-    except ValueError:
-        return(fallbackChannel)
+    for route in routeList:
+        if route["tags"] == ['default']:
+            return route["channel"]
+
+    return(fallbackChannel)
 
 class ServiceIntegration(PluginBase):
 

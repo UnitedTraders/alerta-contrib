@@ -22,6 +22,20 @@ Note: If Alerta is installed in a python virtual environment then plugins
 need to be installed into the same environment for Alerta to dynamically
 discover them.
 
+Testing
+-------
+
+Go to the parent alerta-contrib folder
+
+Install dev dependencies
+    $ pip install --user -r requirements-dev.txt
+
+Run postgres (in docker, for example)
+    $ docker run --rm -e POSTGRES_PASSWORD=alerta -e POSTGRES_USER=alerta -e POSTGRES_DB=alerta -p 5432:5432 postgres
+
+Run tests
+    $ ALERTA_SVR_CONF_FILE= DATABASE_URL=postgres://alerta:alerta@localhost/alerta pytest -v plugins/slack/test_slack.py
+
 Configuration
 -------------
 
@@ -47,7 +61,6 @@ ICON_EMOJI = '' # default :rocket:
 ALERTA_USERNAME = '' # default alerta
 
 ```
-
 
 The `DASHBOARD_URL` setting should be configured to link Slack messages to
 the Alerta console:
@@ -80,9 +93,7 @@ SLACK_SUMMARY_FMT = '*[{{ alert.status|capitalize }}]* [{{ alert.severity|capita
 Configuraton:
 
 ```python
-from collections import OrderedDict
-
-SLACK_CHANNEL_TAG_MAP = OrderedDict({ '#application1-team': ['application=application1', 'severity=major'], '#default-alert-channel': 'default' })
+SLACK_CHANNEL_TAG_MAP =[{"channel": '#application2-team', "tags": ['application=application2']}, {"channel": '#default-alert-channel', "tags": ['default']}]
 ```
 
 If this parameter exists and `SLACK_CHANNEL_ENV_MAP` is not set, tag-based routing applies to the alerts. The plugin gets a set of alert tags and searches for the first occurrence in the `SLACK_CHANNEL_ENV_MAP`. If an occurrence doesn't found, `default` channel is used. If it not exist, `SLACK_CHANNEL` is used.

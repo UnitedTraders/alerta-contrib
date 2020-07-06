@@ -8,20 +8,30 @@ from alerta.app import create_app, custom_webhooks
 class ServiceIntegrationTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.routeTags = OrderedDict({
-            '#application1-major-team': ['application=application1', 'severity=major'],
-            '#application1-minor-team': ['application=application1', 'severity=minor'],
-            '#application2-major-team': ['application=application2', 'severity=major'],
-            '#application2-team': ['application=application2'],
-            '#default-alert-channel': 'default'
-        })
+        self.routeTags = [
+            {"channel": '#application1-major-team',
+                "tags": ['application=application1', 'severity=major']},
+            {"channel": '#application1-minor-team',
+                "tags": ['application=application1', 'severity=minor']},
+            {"channel": '#application2-major-team',
+                "tags": ['application=application2', 'severity=major']},
+            {"channel": '#application2-team',
+                "tags": ['application=application2']},
+            {"channel": '#default-alert-channel',
+                "tags": ['default']}
+        ]
 
-        self.routeTagsWithoutDefault = OrderedDict({
-            '#application1-major-team': ['application=application1', 'severity=major'],
-            '#application1-minor-team': ['application=application1', 'severity=minor'],
-            '#application2-major-team': ['application=application2', 'severity=major'],
-            '#application2-team': ['application=application2']
-        })
+        self.routeTagsWithoutDefault = [
+            {"channel": '#application1-major-team',
+                "tags": ['application=application1', 'severity=major']},
+            {"channel": '#application1-minor-team',
+                "tags": ['application=application1', 'severity=minor']},
+            {"channel": '#application2-major-team',
+                "tags": ['application=application2', 'severity=major']},
+            {"channel": '#application2-team',
+                "tags": ['application=application2']}
+        ]
+
 
         self.routeTagsEmpty = OrderedDict()
 
